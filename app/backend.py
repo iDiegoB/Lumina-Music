@@ -91,8 +91,7 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
     # Resilient client candidates for datacenter/cloud IPs
     client_candidates = [
         ['android'],
-        ['tv_embedded'],
-        ['android_creator']
+        ['ios']
     ]
 
     last_error = None
@@ -105,7 +104,8 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
             'check_formats': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': clients
+                    'player_client': clients,
+                    'player_skip': ['webpage', 'configs']
                 }
             }
         }
