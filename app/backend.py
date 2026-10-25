@@ -46,7 +46,19 @@ yt = YTMusic()
 COOKIES_PATH = os.path.join(DATA_DIR, 'cookies.txt')
 
 def resolve_cookies_file() -> str:
-    """Finds cookies from YOUTUBE_COOKIES environment variable or local file."""
+    """Finds cookies from Render Secret Files (/etc/secrets/cookies.txt), env var, or local file."""
+    # 1. Render Secret Files mount path
+    if os.path.exists('/etc/secrets/cookies.txt') and os.path.getsize('/etc/secrets/cookies.txt') > 10:
+        return '/etc/secrets/cookies.txt'
+
+    # 2. Local cookies.txt in root or data directory
+    root_cookies = os.path.join(os.path.dirname(BASE_DIR), 'cookies.txt')
+    if os.path.exists(root_cookies) and os.path.getsize(root_cookies) > 10:
+        return root_cookies
+    if os.path.exists(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 10:
+        return COOKIES_PATH
+
+    # 3. YOUTUBE_COOKIES environment variable
     env_cookies = os.environ.get('YOUTUBE_COOKIES', '').strip()
     if env_cookies:
         try:
@@ -65,20 +77,16 @@ def resolve_cookies_file() -> str:
         except Exception as e:
             print(f"[AUTH] Error writing YOUTUBE_COOKIES to file: {e}")
 
-    root_cookies = os.path.join(os.path.dirname(BASE_DIR), 'cookies.txt')
-    if os.path.exists(root_cookies):
-        return root_cookies
-    if os.path.exists(COOKIES_PATH):
-        return COOKIES_PATH
     return None
 
 STREAM_CACHE: Dict[str, Dict[str, Any]] = {}
 
 def extract_stream_url(video_id: str) -> Dict[str, Any]:
     """
-    Extracts direct audio stream URL avoiding datacenter IP bot detection.
-    Never uses 'web' client by default because it triggers YouTube bot wall on cloud IPs.
-    Tries resilient mobile/embedded clients and uses cookies if configured.
+    Extracts direct audio stream URL with multiple authentication fallbacks.
+    1. If cookies are provided (Secret Files or ENV), uses authenticated default or TV client.
+    2. Fallback to Android client with player_skip webpage.
+    3. Fallback to iOS client.
     """
     now = time.time()
     if video_id in STREAM_CACHE:
@@ -88,20 +96,17 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
 
     cookiefile = resolve_cookies_file()
 
-    # Android client with player_skip: ['webpage', 'configs'] is the most reliable:
-    # - Does not trigger 429 (skips webpage)
-    # - Does not require JS signature engine
-    # - Not affected by the account-level SABR-only experiment
-    attempts = [
-        {'client': ['android'], 'cookie': False},
-        {'client': ['ios'], 'cookie': False}
-    ]
+    attempts = []
     if cookiefile and os.path.exists(cookiefile):
-        attempts.append({'client': ['mweb'], 'cookie': True})
+        attempts.append({'client': None, 'use_cookie': True})
+        attempts.append({'client': ['tv'], 'use_cookie': True})
+
+    attempts.append({'client': ['android'], 'use_cookie': False})
+    attempts.append({'client': ['ios'], 'use_cookie': False})
 
     last_error = None
     for att in attempts:
-        ydl_opts = {
+        opts = {
             'format': '140/bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
             'skip_download': True,
@@ -109,16 +114,18 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
             'check_formats': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': att['client'],
                     'player_skip': ['webpage', 'configs']
                 }
             }
         }
-        if att['cookie'] and cookiefile and os.path.exists(cookiefile):
-            ydl_opts['cookiefile'] = cookiefile
+        if att['client']:
+            opts['extractor_args']['youtube']['player_client'] = att['client']
+
+        if att['use_cookie'] and cookiefile and os.path.exists(cookiefile):
+            opts['cookiefile'] = cookiefile
 
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
                 stream_url = info.get('url')
                 duration = info.get('duration', 0)
