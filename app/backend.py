@@ -40,23 +40,103 @@ def save_user_data(data: Dict[str, Any]) -> bool:
 app = Bottle()
 yt = YTMusic()
 
-# Singleton yt-dlp instance with Android/Web player client for fast and reliable streams
-YDL_OPTS = {
-    'format': '140/bestaudio[ext=m4a]/bestaudio/best',
-    'quiet': True,
-    'skip_download': True,
-    'noplaylist': True,
-    'check_formats': False,
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    }
-}
-YDL_CLIENT = yt_dlp.YoutubeDL(YDL_OPTS)
+# -------------------------------------------------------------------------
+# YOUTUBE COOKIE & STREAM AUTHENTICATION (Bypasses Datacenter Bot-Walls)
+# -------------------------------------------------------------------------
+COOKIES_PATH = os.path.join(DATA_DIR, 'cookies.txt')
 
-# Cache for stream URLs to avoid re-extracting for recent tracks (valid for 2 hours)
+def resolve_cookies_file() -> str:
+    """Finds cookies from YOUTUBE_COOKIES environment variable or local file."""
+    env_cookies = os.environ.get('YOUTUBE_COOKIES', '').strip()
+    if env_cookies:
+        try:
+            if not env_cookies.startswith('#') and len(env_cookies) > 50 and '\n' not in env_cookies:
+                import base64
+                try:
+                    decoded = base64.b64decode(env_cookies).decode('utf-8', errors='ignore')
+                    if '# Netscape' in decoded or 'youtube.com' in decoded:
+                        env_cookies = decoded
+                except Exception:
+                    pass
+
+            with open(COOKIES_PATH, 'w', encoding='utf-8') as f:
+                f.write(env_cookies)
+            return COOKIES_PATH
+        except Exception as e:
+            print(f"[AUTH] Error writing YOUTUBE_COOKIES to file: {e}")
+
+    root_cookies = os.path.join(os.path.dirname(BASE_DIR), 'cookies.txt')
+    if os.path.exists(root_cookies):
+        return root_cookies
+    if os.path.exists(COOKIES_PATH):
+        return COOKIES_PATH
+    return None
+
 STREAM_CACHE: Dict[str, Dict[str, Any]] = {}
+
+def extract_stream_url(video_id: str) -> Dict[str, Any]:
+    """
+    Extracts direct audio stream URL avoiding datacenter IP bot detection.
+    Never uses 'web' client by default because it triggers YouTube bot wall on cloud IPs.
+    Tries resilient mobile/embedded clients and uses cookies if configured.
+    """
+    now = time.time()
+    if video_id in STREAM_CACHE:
+        cached = STREAM_CACHE[video_id]
+        if now < cached['expires']:
+            return {'url': cached['url'], 'duration': cached['duration']}
+
+    cookiefile = resolve_cookies_file()
+    
+    # Resilient client candidates for datacenter/cloud IPs
+    client_candidates = [
+        ['android'],
+        ['tv_embedded'],
+        ['android_creator']
+    ]
+
+    last_error = None
+    for clients in client_candidates:
+        ydl_opts = {
+            'format': '140/bestaudio[ext=m4a]/bestaudio/best',
+            'quiet': True,
+            'skip_download': True,
+            'noplaylist': True,
+            'check_formats': False,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': clients
+                }
+            }
+        }
+        if cookiefile and os.path.exists(cookiefile):
+            ydl_opts['cookiefile'] = cookiefile
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                stream_url = info.get('url')
+                duration = info.get('duration', 0)
+                if stream_url:
+                    STREAM_CACHE[video_id] = {
+                        'url': stream_url,
+                        'duration': duration,
+                        'expires': now + 7200
+                    }
+                    return {'url': stream_url, 'duration': duration}
+        except Exception as err:
+            last_error = err
+            continue
+
+    err_str = str(last_error) if last_error else 'Unknown error'
+    print(f"[STREAM] Failed extracting stream for {video_id}: {err_str}")
+    if 'Sign in to confirm' in err_str or '429' in err_str:
+        raise Exception(
+            "YouTube requiere autenticación en este servidor en la nube. "
+            "Para solucionarlo de forma permanente, añade la variable YOUTUBE_COOKIES en Render."
+        )
+    raise last_error or Exception("No se pudo obtener el audio de la canción")
+
 
 def get_optimized_thumb(thumbnails: List[Dict[str, Any]], size: int = 226) -> str:
     """Optimizes thumbnail resolution to save memory while looking sharp."""
@@ -290,34 +370,18 @@ def get_playlist_data():
 
 @app.route('/api/stream')
 def stream():
-    """Extracts fast direct audio stream URL using singleton YDL_CLIENT with caching."""
+    """Extracts fast direct audio stream URL with caching and bot-bypass fallback."""
     video_id = request.query.get('id', '').strip()
     if not video_id:
         abort(400, "Missing video id")
-        
-    now = time.time()
-    if video_id in STREAM_CACHE:
-        cached = STREAM_CACHE[video_id]
-        if now < cached['expires']:
-            return {'url': cached['url'], 'duration': cached['duration']}
-            
+
     try:
-        info = YDL_CLIENT.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-        stream_url = info.get('url')
-        duration = info.get('duration', 0)
-        
-        if stream_url:
-            STREAM_CACHE[video_id] = {
-                'url': stream_url,
-                'duration': duration,
-                'expires': now + 7200 # 2 hours
-            }
-            return {'url': stream_url, 'duration': duration}
-        else:
-            abort(500, "Could not extract stream URL")
+        data = extract_stream_url(video_id)
+        return data
     except Exception as e:
-        print(f"Stream extraction error for {video_id}: {e}")
-        abort(500, str(e))
+        msg = str(e)
+        status_code = 429 if ('Sign in' in msg or '429' in msg) else 500
+        abort(status_code, msg)
 
 @app.route('/api/queue')
 def get_related_queue():
