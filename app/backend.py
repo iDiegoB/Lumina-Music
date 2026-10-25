@@ -88,24 +88,19 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
 
     cookiefile = resolve_cookies_file()
 
-    # Client strategy:
-    # 1. 'android' client with player_skip: ['webpage', 'configs'] does NOT trigger 429
-    #    and does NOT require an external JavaScript runtime.
-    # 2. 'mweb' / 'web' as authenticated fallback if cookies are provided.
-    candidates = [
-        {'clients': ['android'], 'use_cookie': False}
+    # Android client with player_skip: ['webpage', 'configs'] is the most reliable:
+    # - Does not trigger 429 (skips webpage)
+    # - Does not require JS signature engine
+    # - Not affected by the account-level SABR-only experiment
+    attempts = [
+        {'client': ['android'], 'cookie': False},
+        {'client': ['ios'], 'cookie': False}
     ]
     if cookiefile and os.path.exists(cookiefile):
-        candidates.append({'clients': ['mweb'], 'use_cookie': True})
-        candidates.append({'clients': ['web'], 'use_cookie': True})
-
-    candidates.append({'clients': ['ios'], 'use_cookie': False})
+        attempts.append({'client': ['mweb'], 'cookie': True})
 
     last_error = None
-    for cand in candidates:
-        clients = cand['clients']
-        use_cookie = cand['use_cookie']
-
+    for att in attempts:
         ydl_opts = {
             'format': '140/bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
@@ -114,12 +109,12 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
             'check_formats': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': clients,
+                    'player_client': att['client'],
                     'player_skip': ['webpage', 'configs']
                 }
             }
         }
-        if use_cookie and cookiefile and os.path.exists(cookiefile):
+        if att['cookie'] and cookiefile and os.path.exists(cookiefile):
             ydl_opts['cookiefile'] = cookiefile
 
         try:
