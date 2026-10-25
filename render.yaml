@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: lumina-music-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT app.backend:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12

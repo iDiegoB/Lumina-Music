@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Lumina Music - Música Sin Anuncios</title>
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#06080d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LuminaMusic">
+    <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./static/icons/icon-192.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./static/css/style.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="theme-dark">
+    <!-- Dynamic Ambient Lighting (Mesh Gradient with dynamic glow) -->
+    <div class="ambient-glow" id="ambient-glow">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-layout">
+        
+        <!-- App Top Header Bar -->
+        <header class="app-top-header">
+            <div class="header-brand">
+                <div class="brand-logo">
+                    <span class="logo-pulse"></span>
+                    <i data-lucide="disc-3" class="logo-icon"></i>
+                </div>
+                <span class="brand-name">Lumina<span class="brand-accent">Music</span></span>
+                <span class="brand-tag">Web & PWA</span>
+            </div>
+
+            <div class="header-center">
+                <!-- Memory Indicator (desktop/debug) -->
+                <div class="memory-badge" id="memory-badge" title="Rendimiento del sistema">
+                    <i data-lucide="cpu" class="badge-icon"></i>
+                    <span id="ram-usage-text">Web Ready</span>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- PWA Install Button (Appears on Mobile / Supported Browsers) -->
+                <button class="btn btn-primary btn-sm" id="btn-pwa-install" style="display: none;" title="Instalar en la pantalla de inicio de tu celular">
+                    <i data-lucide="smartphone"></i>
+                    <span>Instalar App</span>
+                </button>
+                <button class="btn btn-glass btn-sm" id="btn-gamer-mode" title="Modo Ligero: Optimiza animaciones para menor consumo de batería">
+                    <i data-lucide="zap" id="gamer-mode-icon"></i>
+                    <span id="gamer-mode-text">Ahorro</span>
+                </button>
+                <button class="btn btn-glass btn-sm" id="btn-quick-import" title="Pegar enlace de playlist">
+                    <i data-lucide="link"></i>
+                    <span>Pegar Playlist</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Body Area -->
+        <div class="main-body">
+            
+            <!-- Glassmorphic Sidebar -->
+            <aside class="glass-sidebar">
+                <nav class="sidebar-nav">
+                    <div class="nav-section-title">MENÚ PRINCIPAL</div>
+                    <button class="nav-item active" data-view="explore">
+                        <i data-lucide="compass"></i>
+                        <span>Explorar</span>
+                    </button>
+                    <button class="nav-item" data-view="search">
+                        <i data-lucide="search"></i>
+                        <span>Búsqueda</span>
+                    </button>
+                    <button class="nav-item" data-view="favorites">
+                        <i data-lucide="heart"></i>
+                        <span>Favoritos</span>
+                        <span class="nav-badge" id="fav-count">0</span>
+                    </button>
+                    <button class="nav-item" data-view="playlists">
+                        <i data-lucide="library"></i>
+                        <span>Playlists</span>
+                        <span class="nav-badge" id="playlist-count">0</span>
+                    </button>
+                    <button class="nav-item" data-view="queue">
+                        <i data-lucide="list-music"></i>
+                        <span>Cola actual</span>
+                        <span class="nav-badge" id="queue-count">0</span>
+                    </button>
+                    <button class="nav-item" data-view="lyrics">
+                        <i data-lucide="quote"></i>
+                        <span>Letras</span>
+                    </button>
+                </nav>
+
+                <div class="sidebar-action-box">
+                    <button class="btn btn-glass btn-sm w-100" id="btn-open-import-modal">
+                        <i data-lucide="link"></i>
+                        <span>Pegar Playlist</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-spacer"></div>
+
+                <!-- Mini Now Playing Card on Sidebar -->
+                <div class="sidebar-track-preview" id="sidebar-preview" style="display: none;">
+                    <img id="sidebar-thumb" src="" alt="Cover" class="sidebar-thumb">
+                    <div class="sidebar-info">
+                        <div class="sidebar-title marquee-container"><span id="sidebar-title">Canción</span></div>
+                        <div class="sidebar-artist" id="sidebar-artist">Artista</div>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="tech-info">
+                        <span>Motor: Edge WebView2</span>
+                        <span class="tech-highlight">Cero consumo Chromium</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="content-viewport">
+                
+                <!-- Top Navigation & Global Search Bar -->
+                <div class="top-action-bar">
+                    <div class="search-input-wrapper">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="global-search-input" placeholder="Buscar canciones o pega el link de tu playlist (https://...)" autocomplete="off">
+                        <button id="search-clear-btn" class="search-clear-btn" style="display: none;">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+
+                    <!-- Category Quick Filter Chips -->
+                    <div class="genre-chips-container" id="genre-chips">
+                        <button class="chip-btn active" data-category="trending">🔥 Tendencias</button>
+                        <button class="chip-btn" data-category="pop">Pop Internacional</button>
+                        <button class="chip-btn" data-category="rock">Rock</button>
+                        <button class="chip-btn" data-category="latino">Éxitos Latinos</button>
+                        <button class="chip-btn" data-category="lofi">Lo-Fi Chill</button>
+                        <button class="chip-btn" data-category="electronic">Electrónica</button>
+                    </div>
+                </div>
+
+                <!-- Scrollable View Container -->
+                <div class="views-container">
+                    
+                    <!-- VIEW 1: EXPLORE / HOME -->
+                    <section class="view-panel active" id="view-explore">
+                        <!-- Hero Spotlight Banner -->
+                        <div class="hero-banner glass-card">
+                            <div class="hero-content">
+                                <span class="hero-tag"><i data-lucide="sparkles"></i> MÚSICA EN ALTA CALIDAD</span>
+                                <h1 class="hero-title" id="hero-title">Reproductor Ultraliviano Glassmorphism</h1>
+                                <p class="hero-subtitle">Disfruta todo el catálogo de YouTube Music consumiendo menos de 60 MB de memoria RAM.</p>
+                                <div class="hero-actions">
+                                    <button class="btn btn-primary" id="hero-play-random">
+                                        <i data-lucide="play" class="fill-current"></i>
+                                        <span>Reproducir Tendencias</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="hero-artwork">
+                                <div class="hero-vinyl-wrapper">
+                                    <div class="vinyl-disc"></div>
+                                    <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80" alt="Cover" class="hero-art-img" id="hero-img">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Explore Sections (Trending, etc.) -->
+                        <div id="explore-sections" class="explore-sections">
+                            <div class="section-loader">
+                                <div class="spinner"></div>
+                                <span>Cargando catálogo musical...</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- VIEW 2: SEARCH RESULTS -->
+                    <section class="view-panel" id="view-search">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title">Resultados de Búsqueda</h2>
+                                <p class="section-subtitle" id="search-subtitle">Escribe algo en el buscador para empezar</p>
+                            </div>
+                        </div>
+                        <div class="songs-grid" id="search-grid">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </section>
+
+                    <!-- VIEW 3: FAVORITES -->
+                    <section class="view-panel" id="view-favorites">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title">Mis Canciones Favoritas</h2>
+                                <p class="section-subtitle">Tu colección personal guardada localmente</p>
+                            </div>
+                            <button class="btn btn-glass" id="btn-play-all-favorites">
+                                <i data-lucide="play"></i>
+                                <span>Reproducir Todo</span>
+                            </button>
+                        </div>
+                        <div class="songs-grid" id="favorites-grid">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <div class="empty-state" id="favorites-empty" style="display: none;">
+                            <i data-lucide="heart-crack" class="empty-icon"></i>
+                            <h3>No tienes canciones favoritas aún</h3>
+                            <p>Haz clic en el corazón de cualquier canción para guardarla aquí.</p>
+                        </div>
+                    </section>
+
+                    <!-- VIEW 4: QUEUE (COLA) -->
+                    <section class="view-panel" id="view-queue">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title">Cola de Reproducción</h2>
+                                <p class="section-subtitle">Siguientes canciones a reproducir</p>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn btn-glass btn-sm" id="btn-clear-queue">
+                                    <i data-lucide="trash-2"></i>
+                                    <span>Limpiar Cola</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="queue-list" id="queue-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </section>
+
+                    <!-- VIEW 5: LYRICS (LETRAS) -->
+                    <section class="view-panel" id="view-lyrics">
+                        <div class="lyrics-view-container glass-card">
+                            <div class="lyrics-header">
+                                <div class="lyrics-song-meta">
+                                    <h2 id="lyrics-title">Título de la Canción</h2>
+                                    <p id="lyrics-artist">Nombre del Artista</p>
+                                </div>
+                            </div>
+                            <div class="lyrics-body" id="lyrics-content">
+                                <p class="lyrics-placeholder">Reproduce una canción para ver sus letras...</p>
+                            </div>
+                            <div class="lyrics-source" id="lyrics-source"></div>
+                        </div>
+                    </section>
+
+                    <!-- VIEW 6: PLAYLISTS OVERVIEW -->
+                    <section class="view-panel" id="view-playlists">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title">Mis Playlists de YouTube Music</h2>
+                                <p class="section-subtitle">Playlists guardadas e importadas directamente por enlace</p>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="btn-playlists-import-trigger">
+                                <i data-lucide="plus-circle"></i>
+                                <span>Importar Playlist</span>
+                            </button>
+                        </div>
+
+                        <!-- Card to paste link directly -->
+                        <div class="import-hero-box glass-card">
+                            <div class="import-hero-icon">
+                                <i data-lucide="link-2"></i>
+                            </div>
+                            <div class="import-hero-info">
+                                <h3>¿Tienes una playlist de YouTube Music?</h3>
+                                <p>Pega su enlace o ID y escúchala de inmediato con portada y listas completas.</p>
+                            </div>
+                            <div class="import-input-inline">
+                                <input type="text" id="inline-playlist-input" placeholder="https://music.youtube.com/playlist?list=..." autocomplete="off">
+                                <button class="btn btn-primary" id="btn-inline-import">Cargar</button>
+                            </div>
+                        </div>
+
+                        <div class="playlists-grid" id="playlists-grid">
+                            <!-- Populated dynamically with saved playlists -->
+                        </div>
+                    </section>
+
+                    <!-- VIEW 7: PLAYLIST DETAIL -->
+                    <section class="view-panel" id="view-playlist-detail">
+                        <div class="playlist-header-card glass-card">
+                            <div class="playlist-artwork-box">
+                                <img id="pl-detail-cover" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80" alt="Cover" class="pl-detail-cover">
+                            </div>
+                            <div class="playlist-meta-box">
+                                <span class="playlist-tag"><i data-lucide="list-music"></i> PLAYLIST DE YOUTUBE MUSIC</span>
+                                <h1 class="pl-detail-title" id="pl-detail-title">Nombre de la Playlist</h1>
+                                <div class="pl-detail-stats">
+                                    <span id="pl-detail-author">Creado por Usuario</span>
+                                    <span class="dot-separator">•</span>
+                                    <span id="pl-detail-count">0 canciones</span>
+                                </div>
+                                <div class="playlist-actions-row">
+                                    <button class="btn btn-primary" id="btn-pl-play-all">
+                                        <i data-lucide="play" class="fill-current"></i>
+                                        <span>Reproducir Todo</span>
+                                    </button>
+                                    <button class="btn btn-glass" id="btn-pl-queue-all">
+                                        <i data-lucide="list-plus"></i>
+                                        <span>Añadir a la Cola</span>
+                                    </button>
+                                    <button class="btn btn-glass" id="btn-pl-save-toggle">
+                                        <i data-lucide="bookmark" id="pl-save-icon"></i>
+                                        <span id="pl-save-text">Guardar Playlist</span>
+                                    </button>
+                                    <button class="btn btn-glass btn-sm" id="btn-pl-load-all" title="Carga todas las canciones de playlists muy extensas">
+                                        <i data-lucide="refresh-cw"></i>
+                                        <span>Cargar Todo</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Track list table -->
+                        <div class="playlist-tracks-container" id="pl-tracks-container">
+                            <div class="playlist-tracks-list" id="pl-tracks-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                            <div id="pl-tracks-sentinel" style="height: 20px;"></div>
+                        </div>
+                    </section>
+
+                </div>
+            </main>
+        </div>
+
+        <!-- Floating Glassmorphic Player Bar -->
+        <footer class="glass-player-bar" id="player-bar">
+            
+            <!-- Left: Current Track Info & Artwork -->
+            <div class="player-left">
+                <div class="now-playing-art-wrapper">
+                    <img id="player-cover" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80" alt="Cover" class="player-cover">
+                    <div class="equalizer-bars" id="audio-visualizer">
+                        <span class="bar bar-1"></span>
+                        <span class="bar bar-2"></span>
+                        <span class="bar bar-3"></span>
+                        <span class="bar bar-4"></span>
+                    </div>
+                </div>
+                <div class="now-playing-text">
+                    <div class="track-title-wrapper">
+                        <span class="track-title" id="player-title">Selecciona una canción</span>
+                    </div>
+                    <span class="track-artist" id="player-artist">Lumina Music</span>
+                </div>
+                <button class="player-icon-btn fav-toggle-btn" id="btn-toggle-favorite" title="Añadir a favoritos">
+                    <i data-lucide="heart" id="icon-fav"></i>
+                </button>
+            </div>
+
+            <!-- Center: Playback Controls & Progress Bar -->
+            <div class="player-center">
+                <div class="player-controls">
+                    <button class="player-icon-btn" id="btn-shuffle" title="Aleatorio">
+                        <i data-lucide="shuffle"></i>
+                    </button>
+                    <button class="player-icon-btn" id="btn-prev" title="Anterior (Flecha Izq)">
+                        <i data-lucide="skip-back"></i>
+                    </button>
+                    <button class="play-btn-circle" id="btn-play-pause" title="Reproducir / Pausar (Espacio)">
+                        <i data-lucide="play" id="icon-play-pause" class="fill-current"></i>
+                    </button>
+                    <button class="player-icon-btn" id="btn-next" title="Siguiente (Flecha Der)">
+                        <i data-lucide="skip-forward"></i>
+                    </button>
+                    <button class="player-icon-btn" id="btn-repeat" title="Repetir (Desactivado / Todo / Una)">
+                        <i data-lucide="repeat"></i>
+                    </button>
+                </div>
+
+                <div class="player-progress-container">
+                    <span class="time-label" id="current-time">0:00</span>
+                    <div class="slider-track" id="progress-track">
+                        <div class="slider-fill" id="progress-fill" style="width: 0%;"></div>
+                        <div class="slider-thumb" id="progress-thumb" style="left: 0%;"></div>
+                    </div>
+                    <span class="time-label" id="total-duration">0:00</span>
+                </div>
+            </div>
+
+            <!-- Right: Volume, Lyrics, Queue Drawer -->
+            <div class="player-right">
+                <button class="player-icon-btn" id="btn-toggle-lyrics-quick" title="Ver Letras">
+                    <i data-lucide="quote"></i>
+                </button>
+                <button class="player-icon-btn" id="btn-toggle-queue-quick" title="Ver Cola">
+                    <i data-lucide="list-music"></i>
+                </button>
+
+                <div class="volume-container">
+                    <button class="player-icon-btn" id="btn-volume-icon" title="Silenciar / Activar sonido">
+                        <i data-lucide="volume-2" id="icon-volume"></i>
+                    </button>
+                    <div class="volume-slider-track" id="volume-track">
+                        <div class="volume-slider-fill" id="volume-fill" style="width: 80%;"></div>
+                        <div class="volume-slider-thumb" id="volume-thumb" style="left: 80%;"></div>
+                    </div>
+                </div>
+
+                <div class="player-modes-divider"></div>
+
+                <button class="player-icon-btn" id="btn-player-mini" title="Modo Mini Reproductor Flotante (Siempre visible sobre otras apps)">
+                    <i data-lucide="picture-in-picture-2"></i>
+                </button>
+                <button class="player-icon-btn" id="btn-player-fullscreen" title="Ver Canción en Pantalla Completa">
+                    <i data-lucide="maximize-2"></i>
+                </button>
+        </footer>
+
+        <!-- Mobile Bottom Navigation Bar (Visible only on mobile devices) -->
+        <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+            <button class="mobile-nav-item active" data-view="explore">
+                <i data-lucide="compass"></i>
+                <span>Explorar</span>
+            </button>
+            <button class="mobile-nav-item" data-view="search">
+                <i data-lucide="search"></i>
+                <span>Buscar</span>
+            </button>
+            <button class="mobile-nav-item" data-view="favorites">
+                <i data-lucide="heart"></i>
+                <span>Favoritos</span>
+            </button>
+            <button class="mobile-nav-item" data-view="playlists">
+                <i data-lucide="library"></i>
+                <span>Playlists</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- ============================================================
+         FULLSCREEN SONG VISUALIZER (CANCION OCUPA TODA LA PANTALLA)
+         ============================================================ -->
+    <div class="fullscreen-visualizer" id="fullscreen-visualizer" style="display: none;">
+        <div class="fs-backdrop" id="fs-backdrop"></div>
+        <div class="fs-overlay-tint"></div>
+
+        <header class="fs-top-bar">
+            <div class="fs-brand">
+                <i data-lucide="disc-3" class="fs-logo-icon"></i>
+                <span>Lumina <span class="brand-accent">Visualizer</span></span>
+            </div>
+            <div class="fs-actions">
+                <button class="fs-btn-icon" id="fs-btn-native-fs" title="Alternar Pantalla Completa de Windows (F11)">
+                    <i data-lucide="expand" id="fs-icon-native-fs"></i>
+                </button>
+                <button class="fs-btn-icon" id="fs-btn-close" title="Cerrar vista completa (Esc)">
+                    <i data-lucide="minimize-2"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="fs-content">
+            <div class="fs-art-wrapper">
+                <img id="fs-cover" class="fs-cover-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600" alt="Cover">
+                <div class="fs-art-glow"></div>
+            </div>
+
+            <div class="fs-meta-section">
+                <div class="fs-track-info">
+                    <h1 class="fs-title" id="fs-title">Selecciona una canción</h1>
+                    <h2 class="fs-artist" id="fs-artist">Lumina Music</h2>
+                    <p class="fs-album" id="fs-album">YouTube Music</p>
+                </div>
+
+                <!-- Big Interactive Progress Bar -->
+                <div class="fs-progress-container">
+                    <span class="fs-time-label" id="fs-current-time">0:00</span>
+                    <div class="fs-progress-track" id="fs-progress-track">
+                        <div class="fs-progress-fill" id="fs-progress-fill" style="width: 0%;"></div>
+                        <div class="fs-progress-thumb" id="fs-progress-thumb" style="left: 0%;"></div>
+                    </div>
+                    <span class="fs-time-label" id="fs-total-duration">0:00</span>
+                </div>
+
+                <!-- Playback Controls -->
+                <div class="fs-controls">
+                    <button class="fs-ctrl-btn" id="fs-btn-shuffle" title="Aleatorio">
+                        <i data-lucide="shuffle"></i>
+                    </button>
+                    <button class="fs-ctrl-btn" id="fs-btn-prev" title="Anterior (Flecha Izq)">
+                        <i data-lucide="skip-back"></i>
+                    </button>
+                    <button class="fs-play-btn-large" id="fs-btn-play-pause" title="Reproducir / Pausar (Espacio)">
+                        <i data-lucide="play" id="fs-icon-play-pause" class="fill-current"></i>
+                    </button>
+                    <button class="fs-ctrl-btn" id="fs-btn-next" title="Siguiente (Flecha Der)">
+                        <i data-lucide="skip-forward"></i>
+                    </button>
+                    <button class="fs-ctrl-btn" id="fs-btn-repeat" title="Repetir">
+                        <i data-lucide="repeat"></i>
+                    </button>
+                    <button class="fs-ctrl-btn" id="fs-btn-fav" title="Favorito">
+                        <i data-lucide="heart" id="fs-icon-fav"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MINI FLOATING PLAYER (VENTANA SOBREPUESTA EN OTRAS APLICACIONES)
+         - Default: Carátula e Información de la Canción
+         - On Hover: Barra de progreso interactiva y Controles
+         ============================================================ -->
+    <div class="mini-player-container" id="mini-player-container" style="display: none;">
+        <div class="mini-bg-art" id="mini-bg-art"></div>
+        <div class="mini-tint"></div>
+
+        <!-- Top Drag Pill & Actions -->
+        <div class="mini-header-row">
+            <div class="mini-drag-handle" title="Arrastrar para mover">
+                <span class="mini-drag-pill"></span>
+            </div>
+            <div class="mini-top-actions">
+                <button class="mini-action-btn" id="btn-mini-restore" title="Volver a ventana completa (Esc)">
+                    <i data-lucide="maximize-2"></i>
+                </button>
+                <button class="mini-action-btn" id="btn-mini-close" title="Cerrar Lumina Music">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Base View: Imagen y Nombre de la Canción -->
+        <div class="mini-content-row">
+            <div class="mini-art-wrapper">
+                <img id="mini-cover" class="mini-cover-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600" alt="Cover">
+            </div>
+            <div class="mini-text-wrapper">
+                <div class="mini-title-marquee">
+                    <span class="mini-title" id="mini-title">Selecciona una canción</span>
+                </div>
+                <div class="mini-artist" id="mini-artist">Lumina Music</div>
+            </div>
+        </div>
+
+        <!-- Hover Reveal: Progreso de la música y controles al pasar el mouse por encima -->
+        <div class="mini-hover-panel" id="mini-hover-panel">
+            <div class="mini-progress-row">
+                <span class="mini-time-label" id="mini-current-time">0:00</span>
+                <div class="mini-progress-track" id="mini-progress-track">
+                    <div class="mini-progress-fill" id="mini-progress-fill" style="width: 0%;"></div>
+                    <div class="mini-progress-thumb" id="mini-progress-thumb" style="left: 0%;"></div>
+                </div>
+                <span class="mini-time-label" id="mini-total-duration">0:00</span>
+            </div>
+            <div class="mini-controls-row">
+                <button class="mini-ctrl-btn" id="mini-btn-prev" title="Anterior">
+                    <i data-lucide="skip-back"></i>
+                </button>
+                <button class="mini-play-btn" id="mini-btn-play-pause" title="Reproducir / Pausar">
+                    <i data-lucide="play" id="mini-icon-play-pause" class="fill-current"></i>
+                </button>
+                <button class="mini-ctrl-btn" id="mini-btn-next" title="Siguiente">
+                    <i data-lucide="skip-forward"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Native HTML5 Audio Engine -->
+    <audio id="audio-engine" preload="auto"></audio>
+
+    <!-- Toast Notification Overlay -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Import Playlist Glass Modal Dialog -->
+    <div class="modal-overlay" id="modal-import-playlist" style="display: none;">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <i data-lucide="link" class="modal-icon"></i>
+                    <h3>Importar Playlist de YouTube Music</h3>
+                </div>
+                <button class="modal-close-btn" id="btn-close-import-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">
+                    Pega el enlace completo o el ID de tu playlist pública o no listada de YouTube Music para cargar sus carátulas y lista completa:
+                </p>
+                <div class="modal-input-wrap">
+                    <i data-lucide="music" class="input-icon"></i>
+                    <input type="text" id="modal-playlist-input" placeholder="https://music.youtube.com/playlist?list=..." autocomplete="off">
+                </div>
+                <div class="modal-hint">
+                    Ejemplo: <code>https://music.youtube.com/playlist?list=PL6OT...</code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-glass" id="btn-cancel-import-modal">Cancelar</button>
+                <button class="btn btn-primary" id="btn-submit-import-modal">
+                    <i data-lucide="download-cloud"></i>
+                    <span>Cargar Playlist</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Scripts -->
+    <script src="./static/js/config.js"></script>
+    <script src="./static/js/app.js"></script>
+</body>
+</html>
