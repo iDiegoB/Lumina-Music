@@ -45,6 +45,45 @@ yt = YTMusic()
 # -------------------------------------------------------------------------
 COOKIES_PATH = os.path.join(DATA_DIR, 'cookies.txt')
 
+def setup_deno_runtime():
+    """Ensures Deno is available in PATH on Linux so yt-dlp can execute YouTube JS challenges."""
+    import shutil
+    if shutil.which('deno') or shutil.which('node'):
+        return
+
+    if not sys.platform.startswith('linux'):
+        return
+
+    deno_bin_dir = os.path.expanduser('~/.deno/bin')
+    deno_binary = os.path.join(deno_bin_dir, 'deno')
+
+    if os.path.exists(deno_binary):
+        if deno_bin_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = f"{deno_bin_dir}:{os.environ.get('PATH', '')}"
+        return
+
+    try:
+        import urllib.request
+        import zipfile
+        import io
+
+        url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read()
+
+        os.makedirs(deno_bin_dir, exist_ok=True)
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            zf.extract('deno', path=deno_bin_dir)
+
+        os.chmod(deno_binary, 0o755)
+        os.environ['PATH'] = f"{deno_bin_dir}:{os.environ.get('PATH', '')}"
+        print("[SETUP] Deno JavaScript engine installed and active.")
+    except Exception as e:
+        print(f"[SETUP] Notice: Could not install Deno: {e}")
+
+setup_deno_runtime()
+
 def resolve_cookies_file() -> str:
     """Finds cookies from Render Secret Files (/etc/secrets/cookies.txt), env var, or local file."""
     # 1. Render Secret Files mount path
@@ -83,10 +122,10 @@ STREAM_CACHE: Dict[str, Dict[str, Any]] = {}
 
 def extract_stream_url(video_id: str) -> Dict[str, Any]:
     """
-    Extracts direct audio stream URL with multiple authentication fallbacks.
-    1. If cookies are provided (Secret Files or ENV), uses authenticated default or TV client.
-    2. Fallback to Android client with player_skip webpage.
-    3. Fallback to iOS client.
+    Extracts direct audio stream URL with datacenter-tested multi-client IPv4 strategy.
+    1. Forces IPv4 (0.0.0.0) to bypass datacenter IPv6 blocks.
+    2. Uses multi-client candidates ('tv', 'web_embedded', 'mweb', 'android').
+    3. Uses 'ba/b' format to avoid SABR-only format exclusions.
     """
     now = time.time()
     if video_id in STREAM_CACHE:
@@ -96,31 +135,30 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
 
     cookiefile = resolve_cookies_file()
 
-    attempts = []
+    # Strategy 1: IPv4 Datacenter multi-client without cookies (avoids SABR account flag)
+    # Strategy 2: With cookies if provided and needed
+    attempts = [
+        {'clients': ['tv', 'web_embedded', 'mweb', 'android'], 'use_cookie': False}
+    ]
     if cookiefile and os.path.exists(cookiefile):
-        attempts.append({'client': None, 'use_cookie': True})
-        attempts.append({'client': ['tv'], 'use_cookie': True})
-
-    attempts.append({'client': ['android'], 'use_cookie': False})
-    attempts.append({'client': ['ios'], 'use_cookie': False})
+        attempts.append({'clients': ['tv', 'mweb'], 'use_cookie': True})
 
     last_error = None
     for att in attempts:
         opts = {
-            'format': '140/bestaudio[ext=m4a]/bestaudio/best',
+            'format': 'ba/b',
             'quiet': True,
             'skip_download': True,
             'noplaylist': True,
             'check_formats': False,
+            'source_address': '0.0.0.0', # Force IPv4 to bypass datacenter IPv6 blocks
             'extractor_args': {
                 'youtube': {
-                    'player_skip': ['webpage', 'configs']
+                    'player_client': att['clients'],
+                    'player_skip': ['webpage']
                 }
             }
         }
-        if att['client']:
-            opts['extractor_args']['youtube']['player_client'] = att['client']
-
         if att['use_cookie'] and cookiefile and os.path.exists(cookiefile):
             opts['cookiefile'] = cookiefile
 
