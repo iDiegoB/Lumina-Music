@@ -87,15 +87,23 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
             return {'url': cached['url'], 'duration': cached['duration']}
 
     cookiefile = resolve_cookies_file()
-    
-    # Resilient client candidates for datacenter/cloud IPs
-    client_candidates = [
-        ['android'],
-        ['ios']
-    ]
+
+    # Client strategy:
+    # 1. If cookies are provided, use 'web' / 'mweb' which require and utilize cookies.
+    # 2. 'android' client does NOT support cookies in yt-dlp, so run it clean without cookies.
+    candidates = []
+    if cookiefile and os.path.exists(cookiefile):
+        candidates.append({'clients': ['web', 'mweb'], 'use_cookie': True})
+        candidates.append({'clients': ['mweb'], 'use_cookie': True})
+
+    candidates.append({'clients': ['android'], 'use_cookie': False})
+    candidates.append({'clients': ['ios'], 'use_cookie': False})
 
     last_error = None
-    for clients in client_candidates:
+    for cand in candidates:
+        clients = cand['clients']
+        use_cookie = cand['use_cookie']
+
         ydl_opts = {
             'format': '140/bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
@@ -109,7 +117,7 @@ def extract_stream_url(video_id: str) -> Dict[str, Any]:
                 }
             }
         }
-        if cookiefile and os.path.exists(cookiefile):
+        if use_cookie and cookiefile and os.path.exists(cookiefile):
             ydl_opts['cookiefile'] = cookiefile
 
         try:
